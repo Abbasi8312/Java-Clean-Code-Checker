@@ -10,8 +10,6 @@ import java.util.regex.Pattern;
 public class Main {
 
     public static void main(String[] args) {
-        //Scanner scanner = new Scanner(System.in);
-        //String fileName = scanner.nextLine();
         BufferedReader reader;
         String fileName = "Test";
         int lineCounter = 1;
