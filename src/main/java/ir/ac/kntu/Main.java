@@ -22,7 +22,16 @@ public class Main {
         String fileName = "Test";
         try {
             reader = new BufferedReader(new FileReader("src/main/java/ir/ac/kntu/" + fileName));
-            cleanCodeTest(reader);
+            line = reader.readLine();
+            lineCounter = 1;
+            while (line != null) {
+                removeComments();
+                //TODO comment in string literal
+                indentationCheck();
+                cleanCodeTest(reader);
+                line = reader.readLine();
+                lineCounter++;
+            }
             reader.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -30,41 +39,37 @@ public class Main {
     }
 
     private static void cleanCodeTest(BufferedReader reader) throws IOException {
-        line = reader.readLine();
-        lineCounter = 1;
-        while (line != null) {
-            removeComments();
-            indentationCheck();
-            Map<String, Matcher> matcherMap = new HashMap<>();
-            fillMatcherMap(matcherMap);
-            if (matcherMap.get("package").find()) {
-                packageTest(matcherMap.get("package"));
-            } else if (matcherMap.get("import").find()) {
-                importTest(matcherMap.get("import"));
-            } else if (matcherMap.get("call").find()) {
-                callTest(matcherMap.get("call"));
-            } else if (matcherMap.get("variable").find()) {
-                variableTest(matcherMap.get("variable"));
-            } else if (matcherMap.get("class").find()) {
-                classTest(matcherMap.get("class"));
-            } else if (matcherMap.get("method").find()) {
-                methodTest(matcherMap.get("method"));
-            } else if (matcherMap.get("conditional").find()) {
-                conditionalTest(matcherMap.get("conditional"));
-            } else if (matcherMap.get("braces").find()) {
-                bracesTest(matcherMap.get("braces"));
-            } else {
-                offset = 0;
-            }
-            if (offset == 0) {
-                spaceCheck();
-                lineCounter++;
-                line = reader.readLine();
-            } else {
-                line = line.substring(offset);
-                if (line.charAt(0) != '}') {
-                    System.out.printf("%3d| Multiple statements in one line!\n", lineCounter);
-                }
+        Map<String, Matcher> matcherMap = new HashMap<>();
+        fillMatcherMap(matcherMap);
+        if (offset == 0) {
+            spaceCheck();
+        }
+        if (matcherMap.get("package").find()) {
+            packageTest(matcherMap.get("package"));
+        } else if (matcherMap.get("import").find()) {
+            importTest(matcherMap.get("import"));
+        } else if (matcherMap.get("call").find()) {
+            callTest(matcherMap.get("call"));
+        } else if (matcherMap.get("variable").find()) {
+            variableTest(matcherMap.get("variable"));
+        } else if (matcherMap.get("class").find()) {
+            classTest(matcherMap.get("class"));
+        } else if (matcherMap.get("method").find()) {
+            methodTest(matcherMap.get("method"));
+        } else if (matcherMap.get("conditional").find()) {
+            conditionalTest(matcherMap.get("conditional"));
+        } else if (matcherMap.get("braces").find()) {
+            bracesTest(matcherMap.get("braces"));
+        } else if (matcherMap.get("switch").find()) {
+            switchTest(matcherMap.get("switch"), reader);
+        } else {
+            offset = 0;
+        }
+        if (offset != 0) {
+            line = line.substring(offset);
+            if (line.charAt(0) != '}') {
+                System.out.printf("%3d| Multiple statements in one line!\n", lineCounter);
+                cleanCodeTest(reader);
             }
         }
     }
@@ -83,6 +88,7 @@ public class Main {
         matcherMap.put("variable",
                 getMatcher("^(?:\\S+(?:\\[.*]\\s*)*\\s+)?[^\\s(]+\\s*(?:=\\s*(?<equal>[^;]+)?\\s*)?;"));
         matcherMap.put("call", getMatcher("^(?<name>\\S+) *\\((?<arguments>.*?)\\) *;"));
+        matcherMap.put("switch", getMatcher("^switch *(?:\\((?<conditions>.*)\\) *)? *\\{?"));
     }
 
     private static Matcher getMatcher(String regex) {
@@ -102,7 +108,7 @@ public class Main {
 
     private static void variableDeclarationCheck(String string) {
         Matcher parameterMatcher = Pattern.compile(
-                "(?<type>int|byte|long|char|boolean|String|double|float|Scanner)(?:\\s*\\[.*])*\\s+(?<name>[^" +
+                "^(?<type>int|byte|long|char|boolean|String|double|float|Scanner)(?:\\s*\\[.*])*\\s+(?<name>[^" +
                         " ,;]+)").matcher(string);
         while (parameterMatcher.find()) {
             if (!parameterMatcher.group("name").matches("^[a-z][a-zA-Z0-9]+$")) {
@@ -120,6 +126,43 @@ public class Main {
                     conditionalMatcher.group("type"));
         }
         getOffset(conditionalMatcher);
+    }
+
+    private static void switchTest(Matcher switchMatcher, BufferedReader reader) throws IOException {
+        int startingIndentation = indentation;
+        indentation += 4;
+        boolean hasDefault = false;
+        getOffset(switchMatcher);
+        if (offset == 0) {
+            line = reader.readLine();
+            lineCounter++;
+        }
+        while (indentation != startingIndentation && line != null) {
+            removeComments();
+            if (removeStringLiterals(line).matches("^\\s*default\\s*:.*")) {
+                hasDefault = true;
+            }
+            if (!line.matches("^\\s*(case\\s+\\S+\\s*:|}|default\\s*:).*")) {
+                indentation += 4;
+                indentationCheck();
+                indentation -= 4;
+            } else {
+                indentationCheck();
+                line = line.replaceAll("case//s+\\S+\\s*:", "");
+            }
+            cleanCodeTest(reader);
+            line = reader.readLine();
+            lineCounter++;
+        }
+        if (!hasDefault) {
+            System.out.printf("%3d| Switch block must contain default case\n", lineCounter);
+        }
+        if (line == null) {
+            line = "";
+        }
+        removeComments();
+        indentationCheck();
+        cleanCodeTest(reader);
     }
 
     private static void bracesTest(Matcher bracesMatcher) {
@@ -273,7 +316,6 @@ public class Main {
                     rightCount == 0 ? "no" : "one", spaceMatcher.group(3));
         }
     }
-
 
     private static void getOffset(Matcher matcher) {
         if (!matcher.group("offset").matches("")) {

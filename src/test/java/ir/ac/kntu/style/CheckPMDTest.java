@@ -46,7 +46,7 @@ public class CheckPMDTest {
         pmdConfiguration.setReportFormat("text");
         int violations = PMD.doPMD(pmdConfiguration);
         System.out.println("violations = " + violations);
-        Assert.assertTrue("No Vilation in Resource Closing", violations == 0);
+        Assert.assertTrue("No Violation in Resource Closing", violations == 0);
         System.err.println("$$$GRADER$$$ | { type:\"SCORE\" , amount:2 , reason:\"PMD.\" } | $$$GRADER$$$" );
     }
 
