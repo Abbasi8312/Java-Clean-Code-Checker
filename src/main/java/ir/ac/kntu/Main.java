@@ -42,28 +42,30 @@ public class Main {
         Map<String, Matcher> matcherMap = new HashMap<>();
         fillMatcherMap(matcherMap);
         if (offset == 0) {
+            if (matcherMap.get("package").find()) {
+                packageTest(matcherMap.get("package"));
+            } else if (matcherMap.get("for").find()) {
+                forTest(matcherMap.get("for"));
+            } else if (matcherMap.get("import").find()) {
+                importTest(matcherMap.get("import"));
+            } else if (matcherMap.get("call").find()) {
+                callTest(matcherMap.get("call"));
+            } else if (matcherMap.get("variable").find()) {
+                variableTest(matcherMap.get("variable"));
+            } else if (matcherMap.get("class").find()) {
+                classTest(matcherMap.get("class"));
+            } else if (matcherMap.get("method").find()) {
+                methodTest(matcherMap.get("method"));
+            } else if (matcherMap.get("conditional").find()) {
+                conditionalTest(matcherMap.get("conditional"));
+            } else if (matcherMap.get("braces").find()) {
+                bracesTest(matcherMap.get("braces"));
+            } else if (matcherMap.get("switch").find()) {
+                switchTest(matcherMap.get("switch"), reader);
+            } else {
+                offset = 0;
+            }
             spaceCheck();
-        }
-        if (matcherMap.get("package").find()) {
-            packageTest(matcherMap.get("package"));
-        } else if (matcherMap.get("import").find()) {
-            importTest(matcherMap.get("import"));
-        } else if (matcherMap.get("call").find()) {
-            callTest(matcherMap.get("call"));
-        } else if (matcherMap.get("variable").find()) {
-            variableTest(matcherMap.get("variable"));
-        } else if (matcherMap.get("class").find()) {
-            classTest(matcherMap.get("class"));
-        } else if (matcherMap.get("method").find()) {
-            methodTest(matcherMap.get("method"));
-        } else if (matcherMap.get("conditional").find()) {
-            conditionalTest(matcherMap.get("conditional"));
-        } else if (matcherMap.get("braces").find()) {
-            bracesTest(matcherMap.get("braces"));
-        } else if (matcherMap.get("switch").find()) {
-            switchTest(matcherMap.get("switch"), reader);
-        } else {
-            offset = 0;
         }
         if (offset != 0) {
             line = line.substring(offset);
@@ -85,6 +87,8 @@ public class Main {
                 "^(?:public |private )\\s*static\\s+(?<type>\\S+) +(?<name>\\S+) *\\((?<parameters>.*?)\\) *\\{?"));
         matcherMap.put("conditional",
                 getMatcher("^(?<type>if|else|else +if|while) *(?:\\((?<conditions>.*)\\) *)? *\\{?"));
+        matcherMap.put("for", getMatcher(
+                "^for\\s*\\(\\s*(?<initialize>.*\\s*;)\\s*(?<test>.*\\s*;)\\s*(?<update>.*\\s*)\\)\\s*\\{?"));
         matcherMap.put("variable",
                 getMatcher("^(?:\\S+(?:\\[.*]\\s*)*\\s+)?[^\\s(]+\\s*(?:=\\s*(?<equal>[^;]+)?\\s*)?;"));
         matcherMap.put("call", getMatcher("^(?<name>\\S+) *\\((?<arguments>.*?)\\) *;"));
@@ -102,19 +106,20 @@ public class Main {
                     lineCounter);
         }
         String parameters = methodMatcher.group("parameters");
-        variableDeclarationCheck(parameters);
+        variableDeclarationCheck(parameters, 2);
         getOffset(methodMatcher);
     }
 
-    private static void variableDeclarationCheck(String string) {
+    private static void variableDeclarationCheck(String string, int charCount) {
         Matcher parameterMatcher = Pattern.compile(
                 "^(?<type>int|byte|long|char|boolean|String|double|float|Scanner)(?:\\s*\\[.*])*\\s+(?<name>[^" +
                         " ,;]+)").matcher(string);
         while (parameterMatcher.find()) {
-            if (!parameterMatcher.group("name").matches("^[a-z][a-zA-Z0-9]+$")) {
-                System.out.printf(
-                        "%3d| The variable name should be in lowerCamelCase and must have at least 2 characters.\n",
-                        lineCounter);
+            if (!parameterMatcher.group("name").matches("^[a-z][a-zA-Z0-9]*$")) {
+                System.out.printf("%3d| The variable name should be in lowerCamelCase\n", lineCounter);
+            }
+            if (charCount == 2 && parameterMatcher.group("name").length() <= 1) {
+                System.out.printf("%3d| The variable name should have at least 2 characters\n", lineCounter);
             }
         }
     }
@@ -126,6 +131,12 @@ public class Main {
                     conditionalMatcher.group("type"));
         }
         getOffset(conditionalMatcher);
+    }
+
+    private static void forTest(Matcher forMatcher) {
+        indentation += 4;
+        variableDeclarationCheck(forMatcher.group("initialize"), 1);
+        getOffset(forMatcher);
     }
 
     private static void switchTest(Matcher switchMatcher, BufferedReader reader) throws IOException {
@@ -191,12 +202,12 @@ public class Main {
     }
 
     private static void variableTest(Matcher variableMatcher) {
-        variableDeclarationCheck(variableMatcher.group());
+        variableDeclarationCheck(variableMatcher.group(), 2);
         getOffset(variableMatcher);
     }
 
     private static void callTest(Matcher callMatcher) {
-        variableDeclarationCheck(callMatcher.group());
+        variableDeclarationCheck(callMatcher.group(), 2);
         getOffset(callMatcher);
     }
 
@@ -226,7 +237,8 @@ public class Main {
     }
 
     private static String removeStringLiterals(String line) {
-        return line.replaceAll("\"(?:\\\\.|[^\"])*[^\\\\]\"", "\"\"");
+        String newLine = line.replaceAll("\"(?:\\\\.|[^\"])*[^\\\\]\"", "\"\"");
+        return newLine.replaceAll("'(?:\\\\.|[^'])*[^\\\\]'", "''");
     }
 
     private static void checkOperatorSpacing(String line) {
