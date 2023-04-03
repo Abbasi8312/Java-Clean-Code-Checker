@@ -3,7 +3,9 @@ package ir.ac.kntu;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,9 +15,13 @@ public class Main {
 
     private static int indentation;
 
+    private static int originalIndentation;
+
     private static String line;
 
     private static String originalLine;
+
+    private static List<Integer> multipleLinesIndex = new ArrayList<>();
 
     private static int offset;
 
@@ -29,7 +35,12 @@ public class Main {
             while (line != null) {
                 originalLine = line;
                 modifyLine();
-                indentationCheck();
+                if (multipleLinesIndex.size() != 0) {
+                    indentation = originalIndentation;
+                    lineCounter += multipleLinesIndex.size();
+                    multipleLinesIndex = new ArrayList<>();
+                }
+                indentationCheck(line);
                 cleanCodeTest(reader);
                 line = reader.readLine();
                 lineCounter++;
@@ -52,6 +63,8 @@ public class Main {
             forTest(matcherMap.get("for"));
         } else if (matcherMap.get("import").find()) {
             importTest(matcherMap.get("import"));
+        } else if (matcherMap.get("other").find()) {
+            otherTest(matcherMap.get("other"));
         } else if (matcherMap.get("call").find()) {
             callTest(matcherMap.get("call"));
         } else if (matcherMap.get("variable").find()) {
@@ -66,16 +79,48 @@ public class Main {
             bracesTest(matcherMap.get("braces"));
         } else if (matcherMap.get("switch").find()) {
             switchTest(matcherMap.get("switch"), reader);
-        } else {
-            offset = 0;
+        } else if (!line.matches("^\\s*$")) {
+            multipleLines(reader);
         }
         if (offset != 0) {
             line = line.substring(offset);
             if (line.charAt(0) != '}') {
-                System.out.printf("%3d| Multiple statements in one line!\n", lineCounter);
+                System.out.printf("%3d| Multiple statements in one line!\n", getLineCount());
                 cleanCodeTest(reader);
             }
         }
+    }
+
+    public static void multipleLines(BufferedReader reader) throws IOException {
+        String newLine = reader.readLine();
+        modifyLine();
+        if (multipleLinesIndex.size() != 0) {
+            originalIndentation = indentation;
+            Matcher matcher1 = Pattern.compile("\\(.*$").matcher(line);
+            Matcher matcher2 = Pattern.compile("=.*$").matcher(line);
+            if (matcher1.find()) {
+                indentation = matcher1.start() + 1;
+            } else if (matcher2.find()) {
+                indentation = matcher2.start() + 1;
+            } else {
+                System.out.printf("%3d| Invalid line break\n", getLineCount());
+            }
+        }
+        multipleLinesIndex.add(line.length());
+        line = line + " " + newLine.trim();
+        indentationCheck(newLine);
+        cleanCodeTest(reader);
+    }
+
+    private static int getLineCount() {
+        return lineCounter + multipleLinesIndex.size();
+    }
+
+    private static String getLine() {
+        if (multipleLinesIndex.size() > 0) {
+            return line.substring(multipleLinesIndex.get(multipleLinesIndex.size() - 1));
+        }
+        return line;
     }
 
     private static void fillMatcherMap(Map<String, Matcher> matcherMap) {
@@ -96,22 +141,23 @@ public class Main {
                 getMatcher("(?:\\S+(?:\\[.*]\\s*)*\\s+)?[^\\s(]+\\s*(?:=\\s*(?<equal>[^;]+)?\\s*)?;"));
         matcherMap.put("call", getMatcher("(?<name>\\S+)\\s*\\((?<arguments>.*?)\\)\\s*;"));
         matcherMap.put("switch", getMatcher("switch\\s*(?:\\((?<conditions>.*)\\)\\s*)?\\s*(?<brace>\\{?)"));
+        matcherMap.put("other", getMatcher("case\\s*:|default\\s*:|break\\s*;|continue\\s*;"));
     }
 
     private static Matcher getMatcher(String regex) {
-        return Pattern.compile("^\\s*" + regex + "\\s*(?<offset>.*?)$").matcher(line);
+        return Pattern.compile("^\\s*(?:" + regex + ")\\s*(?<offset>.*?)$").matcher(line);
     }
 
     private static void methodTest(Matcher methodMatcher) {
         indentation += 4;
         if (!methodMatcher.group("name").matches("^[a-z][a-zA-Z0-9]+$")) {
             System.out.printf("%3d| The method name should be in lowerCamelCase and must have at least 2 characters.\n",
-                    lineCounter);
+                    getLineCount());
         }
         String parameters = methodMatcher.group("parameters");
         variableDeclarationCheck(parameters, 2);
         if (methodMatcher.group("brace").matches("")) {
-            System.out.printf("%3d| method declaration must contain \"{\" in front of it\n", lineCounter);
+            System.out.printf("%3d| method declaration must contain \"{\" in front of it\n", getLineCount());
         }
         getOffset(methodMatcher);
     }
@@ -122,10 +168,10 @@ public class Main {
                         " ,;]+)").matcher(string);
         while (parameterMatcher.find()) {
             if (!parameterMatcher.group("name").matches("^[a-z][a-zA-Z0-9]*$")) {
-                System.out.printf("%3d| The variable name should be in lowerCamelCase\n", lineCounter);
+                System.out.printf("%3d| The variable name should be in lowerCamelCase\n", getLineCount());
             }
             if (charCount == 2 && parameterMatcher.group("name").length() <= 1) {
-                System.out.printf("%3d| The variable name should have at least 2 characters\n", lineCounter);
+                System.out.printf("%3d| The variable name should have at least 2 characters\n", getLineCount());
             }
         }
     }
@@ -133,11 +179,11 @@ public class Main {
     private static void conditionalTest(Matcher conditionalMatcher) {
         indentation += 4;
         if (conditionalMatcher.group("type").equals("else") || conditionalMatcher.group("type").equals("else if")) {
-            System.out.printf("%3d| The \"%s\" statement shouldn't be on a new line\n", lineCounter,
+            System.out.printf("%3d| The \"%s\" statement shouldn't be on a new line\n", getLineCount(),
                     conditionalMatcher.group("type"));
         }
         if (conditionalMatcher.group("brace").matches("")) {
-            System.out.printf("%3d| %s statement must contain \"{\" in front of it\n", lineCounter,
+            System.out.printf("%3d| %s statement must contain \"{\" in front of it\n", getLineCount(),
                     conditionalMatcher.group("type"));
         }
         getOffset(conditionalMatcher);
@@ -147,7 +193,7 @@ public class Main {
         indentation += 4;
         variableDeclarationCheck(forMatcher.group("initialize"), 1);
         if (forMatcher.group("brace").matches("")) {
-            System.out.printf("%3d| for statement must contain \"{\" in front of it\n", lineCounter);
+            System.out.printf("%3d| for statement must contain \"{\" in front of it\n", getLineCount());
         }
         getOffset(forMatcher);
     }
@@ -162,43 +208,47 @@ public class Main {
             lineCounter++;
         }
         if (switchMatcher.group("brace").matches("")) {
-            System.out.printf("%3d| switch statement must contain \"{\" in front of it\n", lineCounter);
+            System.out.printf("%3d| switch statement must contain \"{\" in front of it\n", getLineCount());
         }
         while (indentation != startingIndentation && line != null) {
             modifyLine();
+            if (multipleLinesIndex.size() != 0) {
+                indentation = originalIndentation;
+                lineCounter += multipleLinesIndex.size();
+                multipleLinesIndex = new ArrayList<>();
+            }
             if (line.matches("^\\s*default\\s*:.*")) {
                 hasDefault = true;
             }
             if (!line.matches("^\\s*(case\\s+\\S+\\s*:|}|default\\s*:).*")) {
                 indentation += 4;
-                indentationCheck();
+                indentationCheck(line);
                 indentation -= 4;
             } else {
-                indentationCheck();
-                line = line.replaceAll("case//s+\\S+\\s*:", "");
+                indentationCheck(line);
             }
             cleanCodeTest(reader);
             line = reader.readLine();
             lineCounter++;
         }
         if (!hasDefault) {
-            System.out.printf("%3d| Switch block must contain default case\n", lineCounter);
+            System.out.printf("%3d| Switch block must contain default case\n", getLineCount());
         }
         if (line == null) {
             line = "";
         }
         modifyLine();
-        indentationCheck();
+        indentationCheck(line);
         cleanCodeTest(reader);
     }
 
     private static void bracesTest(Matcher bracesMatcher) {
         indentation -= 4;
         if (bracesMatcher.group("type").equals("{")) {
-            System.out.printf("%3d| \"{\" shouldn't be on a new line\n", lineCounter);
+            System.out.printf("%3d| \"{\" shouldn't be on a new line\n", getLineCount());
             indentation += 4;
         } else if (bracesMatcher.group("type").equals("}") && offset != 0) {
-            System.out.printf("%3d| \"}\" should be on a new line\n", lineCounter);
+            System.out.printf("%3d| \"}\" should be on a new line\n", getLineCount());
         } else if (bracesMatcher.group("conditional") != null) {
             indentation += 4;
         }
@@ -208,10 +258,10 @@ public class Main {
     private static void classTest(Matcher classMatcher) {
         indentation += 4;
         if (!classMatcher.group("name").matches("^[A-Z][a-zA-Z0-9]*$")) {
-            System.out.printf("%3d| The class name should be in UpperCamelCase.\n", lineCounter);
+            System.out.printf("%3d| The class name should be in UpperCamelCase.\n", getLineCount());
         }
         if (classMatcher.group("brace").matches("")) {
-            System.out.printf("%3d| class statement must contain \"{\" in front of it\n", lineCounter);
+            System.out.printf("%3d| class statement must contain \"{\" in front of it\n", getLineCount());
         }
         getOffset(classMatcher);
     }
@@ -232,12 +282,16 @@ public class Main {
 
     private static void packageTest(Matcher packageMatcher) {
         if (lineCounter != 1) {
-            System.out.printf("%3d| The \"package\" statement should be the first line of code!\n", lineCounter);
+            System.out.printf("%3d| The \"package\" statement should be the first line of code!\n", getLineCount());
         }
         getOffset(packageMatcher);
     }
 
-    private static void indentationCheck() {
+    private static void otherTest(Matcher otherMatcher) {
+        getOffset(otherMatcher);
+    }
+
+    private static void indentationCheck(String line) {
         int spaces = 0;
         for (int i = 0; i < line.length() && line.charAt(i) == ' '; i++) {
             spaces++;
@@ -246,7 +300,7 @@ public class Main {
             spaces += 4;
         }
         if (indentation != spaces && spaces != line.length()) {
-            System.out.printf("%3d| Wrong indentation!\n", lineCounter);
+            System.out.printf("%3d| Wrong indentation!\n", getLineCount());
         }
     }
 
@@ -326,11 +380,11 @@ public class Main {
     }
 
     private static void checkWordSpacing(String line) {
-        Matcher spaceMatcher = Pattern.compile("([A-Za-z0-9]+)( +)([A-Za-z0-9]+)").matcher(line);
+        Matcher spaceMatcher = Pattern.compile("([A-Za-z0-9]+)(\\s+)([A-Za-z0-9]+)").matcher(line);
         int index = 0;
         while (spaceMatcher.find(index)) {
             if (!spaceMatcher.group(2).equals(" ")) {
-                System.out.printf("%3d| There should be one space between \"%s\" and \"%s\"\n", lineCounter,
+                System.out.printf("%3d| There should be one space between \"%s\" and \"%s\"\n", getLineCount(),
                         spaceMatcher.group(1), spaceMatcher.group(3));
             }
             index = spaceMatcher.start(3);
@@ -338,18 +392,20 @@ public class Main {
     }
 
     private static void spaceCheck() {
-        checkOperatorSpacing(line);
-        checkWordSpacing(line);
+        checkOperatorSpacing(getLine());
+        checkWordSpacing(getLine());
     }
 
     private static void edgeSpacing(Matcher spaceMatcher, int leftCount, int rightCount) {
         if (leftCount != -1 && !spaceMatcher.group(2).equals(leftCount == 0 ? "" : " ")) {
-            System.out.printf("%3d| There should be %s space before \"%s\"\n", lineCounter,
+            System.out.printf("%3d| There should be %s space before \"%s\"\n", getLineCount(),
                     leftCount == 0 ? "no" : "one", spaceMatcher.group(3));
         }
         if (rightCount != -1 && !spaceMatcher.group(4).equals(rightCount == 0 ? "" : " ")) {
-            System.out.printf("%3d| There should be %s space after \"%s\"\n", lineCounter,
-                    rightCount == 0 ? "no" : "one", spaceMatcher.group(3));
+            if (!spaceMatcher.group(5).matches("")) {
+                System.out.printf("%3d| There should be %s space after \"%s\"\n", getLineCount(),
+                        rightCount == 0 ? "no" : "one", spaceMatcher.group(3));
+            }
         }
     }
 
@@ -361,5 +417,5 @@ public class Main {
         }
     }
 }
-//TODO multiple lines + other statements
-//Todo exact location of error
+//TODO break long lines
+//TODO remove flag
