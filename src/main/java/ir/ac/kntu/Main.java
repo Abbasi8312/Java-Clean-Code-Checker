@@ -15,6 +15,8 @@ public class Main {
 
     private static String line;
 
+    private static String originalLine;
+
     private static int offset;
 
     public static void main(String[] args) {
@@ -25,8 +27,8 @@ public class Main {
             line = reader.readLine();
             lineCounter = 1;
             while (line != null) {
-                removeComments();
-                //TODO comment in string literal
+                originalLine = line;
+                modifyLine();
                 indentationCheck();
                 cleanCodeTest(reader);
                 line = reader.readLine();
@@ -42,30 +44,30 @@ public class Main {
         Map<String, Matcher> matcherMap = new HashMap<>();
         fillMatcherMap(matcherMap);
         if (offset == 0) {
-            if (matcherMap.get("package").find()) {
-                packageTest(matcherMap.get("package"));
-            } else if (matcherMap.get("for").find()) {
-                forTest(matcherMap.get("for"));
-            } else if (matcherMap.get("import").find()) {
-                importTest(matcherMap.get("import"));
-            } else if (matcherMap.get("call").find()) {
-                callTest(matcherMap.get("call"));
-            } else if (matcherMap.get("variable").find()) {
-                variableTest(matcherMap.get("variable"));
-            } else if (matcherMap.get("class").find()) {
-                classTest(matcherMap.get("class"));
-            } else if (matcherMap.get("method").find()) {
-                methodTest(matcherMap.get("method"));
-            } else if (matcherMap.get("conditional").find()) {
-                conditionalTest(matcherMap.get("conditional"));
-            } else if (matcherMap.get("braces").find()) {
-                bracesTest(matcherMap.get("braces"));
-            } else if (matcherMap.get("switch").find()) {
-                switchTest(matcherMap.get("switch"), reader);
-            } else {
-                offset = 0;
-            }
             spaceCheck();
+        }
+        if (matcherMap.get("package").find()) {
+            packageTest(matcherMap.get("package"));
+        } else if (matcherMap.get("for").find()) {
+            forTest(matcherMap.get("for"));
+        } else if (matcherMap.get("import").find()) {
+            importTest(matcherMap.get("import"));
+        } else if (matcherMap.get("call").find()) {
+            callTest(matcherMap.get("call"));
+        } else if (matcherMap.get("variable").find()) {
+            variableTest(matcherMap.get("variable"));
+        } else if (matcherMap.get("class").find()) {
+            classTest(matcherMap.get("class"));
+        } else if (matcherMap.get("method").find()) {
+            methodTest(matcherMap.get("method"));
+        } else if (matcherMap.get("conditional").find()) {
+            conditionalTest(matcherMap.get("conditional"));
+        } else if (matcherMap.get("braces").find()) {
+            bracesTest(matcherMap.get("braces"));
+        } else if (matcherMap.get("switch").find()) {
+            switchTest(matcherMap.get("switch"), reader);
+        } else {
+            offset = 0;
         }
         if (offset != 0) {
             line = line.substring(offset);
@@ -77,26 +79,27 @@ public class Main {
     }
 
     private static void fillMatcherMap(Map<String, Matcher> matcherMap) {
-        matcherMap.put("package", getMatcher("^package +\\S+ *;"));
-        matcherMap.put("import", getMatcher("^import +\\S+ *;"));
-        matcherMap.put("class", getMatcher("^public +class +(?<name>\\S+) *\\{?"));
+        matcherMap.put("package", getMatcher("package\\s+\\S+\\s*;"));
+        matcherMap.put("import", getMatcher("import\\s+\\S+\\s*;"));
+        matcherMap.put("class", getMatcher("public\\s+class\\s+(?<name>\\S+)\\s*(?<brace>\\{?)"));
         matcherMap.put("braces",
-                Pattern.compile("^(?<indentation> *)(?<type>}(?<conditional>[^{]*\\{?)|\\{) *(?<offset>.*?)$")
-                        .matcher(line));
+                getMatcher("(?<type>}\\s*(?<conditional>(?:else\\s+if\\s*\\(.*\\)|else)\\s*\\{?)?|\\{)"));
         matcherMap.put("method", getMatcher(
-                "^(?:public |private )\\s*static\\s+(?<type>\\S+) +(?<name>\\S+) *\\((?<parameters>.*?)\\) *\\{?"));
-        matcherMap.put("conditional",
-                getMatcher("^(?<type>if|else|else +if|while) *(?:\\((?<conditions>.*)\\) *)? *\\{?"));
+                "(?:public\\s|private\\s)\\s*static\\s+(?<type>\\S+)\\s+(?<name>\\S+)\\s*\\((?<parameters>.*?)\\)" +
+                        "\\s*(?<brace>\\{?)"));
+        matcherMap.put("conditional", getMatcher(
+                "(?<type>if|else|else\\s+if|while)\\s*(?:\\((?<conditions>[^{]*)\\)\\s*)?\\s*(?<brace>\\{?)"));
         matcherMap.put("for", getMatcher(
-                "^for\\s*\\(\\s*(?<initialize>.*\\s*;)\\s*(?<test>.*\\s*;)\\s*(?<update>.*\\s*)\\)\\s*\\{?"));
+                "for\\s*\\(\\s*(?<initialize>.*\\s*;)\\s*(?<test>.*\\s*;)\\s*(?<update>[^{]*\\s*)\\)\\s*" +
+                        "(?<brace>\\{?)"));
         matcherMap.put("variable",
-                getMatcher("^(?:\\S+(?:\\[.*]\\s*)*\\s+)?[^\\s(]+\\s*(?:=\\s*(?<equal>[^;]+)?\\s*)?;"));
-        matcherMap.put("call", getMatcher("^(?<name>\\S+) *\\((?<arguments>.*?)\\) *;"));
-        matcherMap.put("switch", getMatcher("^switch *(?:\\((?<conditions>.*)\\) *)? *\\{?"));
+                getMatcher("(?:\\S+(?:\\[.*]\\s*)*\\s+)?[^\\s(]+\\s*(?:=\\s*(?<equal>[^;]+)?\\s*)?;"));
+        matcherMap.put("call", getMatcher("(?<name>\\S+)\\s*\\((?<arguments>.*?)\\)\\s*;"));
+        matcherMap.put("switch", getMatcher("switch\\s*(?:\\((?<conditions>.*)\\)\\s*)?\\s*(?<brace>\\{?)"));
     }
 
     private static Matcher getMatcher(String regex) {
-        return Pattern.compile(regex + " *(?<offset>.*?)$").matcher(line);
+        return Pattern.compile("^\\s*" + regex + "\\s*(?<offset>.*?)$").matcher(line);
     }
 
     private static void methodTest(Matcher methodMatcher) {
@@ -107,12 +110,15 @@ public class Main {
         }
         String parameters = methodMatcher.group("parameters");
         variableDeclarationCheck(parameters, 2);
+        if (methodMatcher.group("brace").matches("")) {
+            System.out.printf("%3d| method declaration must contain \"{\" in front of it\n", lineCounter);
+        }
         getOffset(methodMatcher);
     }
 
     private static void variableDeclarationCheck(String string, int charCount) {
         Matcher parameterMatcher = Pattern.compile(
-                "^(?<type>int|byte|long|char|boolean|String|double|float|Scanner)(?:\\s*\\[.*])*\\s+(?<name>[^" +
+                "^\\s*(?<type>int|byte|long|char|boolean|String|double|float|Scanner)(?:\\s*\\[.*])*\\s+(?<name>[^" +
                         " ,;]+)").matcher(string);
         while (parameterMatcher.find()) {
             if (!parameterMatcher.group("name").matches("^[a-z][a-zA-Z0-9]*$")) {
@@ -130,12 +136,19 @@ public class Main {
             System.out.printf("%3d| The \"%s\" statement shouldn't be on a new line\n", lineCounter,
                     conditionalMatcher.group("type"));
         }
+        if (conditionalMatcher.group("brace").matches("")) {
+            System.out.printf("%3d| %s statement must contain \"{\" in front of it\n", lineCounter,
+                    conditionalMatcher.group("type"));
+        }
         getOffset(conditionalMatcher);
     }
 
     private static void forTest(Matcher forMatcher) {
         indentation += 4;
         variableDeclarationCheck(forMatcher.group("initialize"), 1);
+        if (forMatcher.group("brace").matches("")) {
+            System.out.printf("%3d| for statement must contain \"{\" in front of it\n", lineCounter);
+        }
         getOffset(forMatcher);
     }
 
@@ -148,9 +161,12 @@ public class Main {
             line = reader.readLine();
             lineCounter++;
         }
+        if (switchMatcher.group("brace").matches("")) {
+            System.out.printf("%3d| switch statement must contain \"{\" in front of it\n", lineCounter);
+        }
         while (indentation != startingIndentation && line != null) {
-            removeComments();
-            if (removeStringLiterals(line).matches("^\\s*default\\s*:.*")) {
+            modifyLine();
+            if (line.matches("^\\s*default\\s*:.*")) {
                 hasDefault = true;
             }
             if (!line.matches("^\\s*(case\\s+\\S+\\s*:|}|default\\s*:).*")) {
@@ -171,19 +187,19 @@ public class Main {
         if (line == null) {
             line = "";
         }
-        removeComments();
+        modifyLine();
         indentationCheck();
         cleanCodeTest(reader);
     }
 
     private static void bracesTest(Matcher bracesMatcher) {
         indentation -= 4;
-        if (bracesMatcher.group("type").equals("}") && offset != 0) {
-            System.out.printf("%3d| \"}\" should be on a new line\n", lineCounter);
-        } else if (bracesMatcher.group("type").equals("{")) {
+        if (bracesMatcher.group("type").equals("{")) {
             System.out.printf("%3d| \"{\" shouldn't be on a new line\n", lineCounter);
             indentation += 4;
-        } else if (bracesMatcher.group("conditional").matches(" *(else|else +if) *\\{?")) {
+        } else if (bracesMatcher.group("type").equals("}") && offset != 0) {
+            System.out.printf("%3d| \"}\" should be on a new line\n", lineCounter);
+        } else if (bracesMatcher.group("conditional") != null) {
             indentation += 4;
         }
         getOffset(bracesMatcher);
@@ -193,6 +209,9 @@ public class Main {
         indentation += 4;
         if (!classMatcher.group("name").matches("^[A-Z][a-zA-Z0-9]*$")) {
             System.out.printf("%3d| The class name should be in UpperCamelCase.\n", lineCounter);
+        }
+        if (classMatcher.group("brace").matches("")) {
+            System.out.printf("%3d| class statement must contain \"{\" in front of it\n", lineCounter);
         }
         getOffset(classMatcher);
     }
@@ -223,22 +242,28 @@ public class Main {
         for (int i = 0; i < line.length() && line.charAt(i) == ' '; i++) {
             spaces++;
         }
-        if (spaces < line.length() && line.charAt(spaces) == '}') {
+        if (spaces < line.length() && (line.charAt(spaces) == '}' || line.charAt(spaces) == '{')) {
             spaces += 4;
         }
         if (indentation != spaces && spaces != line.length()) {
             System.out.printf("%3d| Wrong indentation!\n", lineCounter);
         }
-        line = line.trim();
     }
 
-    private static void removeComments() {
-        line = line.replaceAll("//.*", "");
-    }
-
-    private static String removeStringLiterals(String line) {
-        String newLine = line.replaceAll("\"(?:\\\\.|[^\"])*[^\\\\]\"", "\"\"");
-        return newLine.replaceAll("'(?:\\\\.|[^'])*[^\\\\]'", "''");
+    private static void modifyLine() {
+        line = line.replaceAll("^[^\"]*//.*", "");
+        Matcher matcher = Pattern.compile("\"(?:\\\\.|[^\"])*[^\\\\]\"|'(?:\\\\.|[^'])*[^\\\\]'").matcher(line);
+        StringBuilder newLine = new StringBuilder(line);
+        int start = 0;
+        while (matcher.find(start)) {
+            newLine.replace(matcher.start() + 1, matcher.end() - 1, ".".repeat(matcher.group().length() - 2));
+            start = matcher.end();
+        }
+        line = String.valueOf(newLine);
+        Matcher commentMatcher = Pattern.compile("//.*").matcher(line);
+        if (commentMatcher.find()) {
+            line = line.substring(0, commentMatcher.start());
+        }
     }
 
     private static void checkOperatorSpacing(String line) {
@@ -313,9 +338,8 @@ public class Main {
     }
 
     private static void spaceCheck() {
-        String newLine = removeStringLiterals(line);
-        checkOperatorSpacing(newLine);
-        checkWordSpacing(newLine);
+        checkOperatorSpacing(line);
+        checkWordSpacing(line);
     }
 
     private static void edgeSpacing(Matcher spaceMatcher, int leftCount, int rightCount) {
@@ -337,3 +361,5 @@ public class Main {
         }
     }
 }
+//TODO multiple lines + other statements
+//Todo exact location of error
