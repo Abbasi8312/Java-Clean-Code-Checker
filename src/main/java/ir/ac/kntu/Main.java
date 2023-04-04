@@ -21,6 +21,8 @@ public class Main {
 
     private static String originalLine;
 
+    private static String newLine;
+
     private static List<Integer> multipleLinesIndex = new ArrayList<>();
 
     private static int offset;
@@ -35,6 +37,7 @@ public class Main {
             while (line != null) {
                 originalLine = line;
                 modifyLine();
+                newLine = line;
                 if (multipleLinesIndex.size() != 0) {
                     indentation = originalIndentation;
                     lineCounter += multipleLinesIndex.size();
@@ -92,9 +95,9 @@ public class Main {
     }
 
     public static void multipleLines(BufferedReader reader) throws IOException {
-        String newLine = reader.readLine();
+        String tmp = reader.readLine();
         modifyLine();
-        if (multipleLinesIndex.size() != 0) {
+        if (multipleLinesIndex.size() == 0) {
             originalIndentation = indentation;
             Matcher matcher1 = Pattern.compile("\\(.*$").matcher(line);
             Matcher matcher2 = Pattern.compile("=.*$").matcher(line);
@@ -103,12 +106,13 @@ public class Main {
             } else if (matcher2.find()) {
                 indentation = matcher2.start() + 1;
             } else {
-                System.out.printf("%3d| Invalid line break\n", getLineCount());
+                indentation += 8;
             }
         }
         multipleLinesIndex.add(line.length());
-        line = line + " " + newLine.trim();
-        indentationCheck(newLine);
+        newLine = tmp;
+        line = line + " " + tmp.trim();
+        indentationCheck(tmp);
         cleanCodeTest(reader);
     }
 
@@ -322,7 +326,7 @@ public class Main {
 
     private static void checkOperatorSpacing(String line) {
         Matcher spaceMatcher = Pattern.compile(
-                        "(\\S+?)(\\s*)(\\|\\||\\+\\+|\\+=|\\*=|\\|=|&&|==|!=|<=|>=|--|-=|/=|%=|&=|\\^=|" +
+                        "(\\S+?|^)(\\s*)(\\|\\||\\+\\+|\\+=|\\*=|\\|=|&&|==|!=|<=|>=|--|-=|/=|%=|&=|\\^=|" +
                                 "(?<![&^|!<>=+*/%\\-])[\\[\\]\\-;:(){,=+*/<>^%&|])(\\s*)([^ \\[\\]\\-:(){," +
                                 "=+*/<>^%&|]*)")
                 .matcher(line);
@@ -384,27 +388,29 @@ public class Main {
         int index = 0;
         while (spaceMatcher.find(index)) {
             if (!spaceMatcher.group(2).equals(" ")) {
-                System.out.printf("%3d| There should be one space between \"%s\" and \"%s\"\n", getLineCount(),
-                        spaceMatcher.group(1), spaceMatcher.group(3));
+                System.out.printf("%3d| There should be one space between \"%s\" and \"%s\" (near character %d)\n",
+                        getLineCount(), spaceMatcher.group(1), spaceMatcher.group(3), spaceMatcher.start(2) + 1);
             }
             index = spaceMatcher.start(3);
         }
     }
 
     private static void spaceCheck() {
-        checkOperatorSpacing(getLine());
-        checkWordSpacing(getLine());
+        checkOperatorSpacing(newLine);
+        checkWordSpacing(newLine);
     }
 
     private static void edgeSpacing(Matcher spaceMatcher, int leftCount, int rightCount) {
         if (leftCount != -1 && !spaceMatcher.group(2).equals(leftCount == 0 ? "" : " ")) {
-            System.out.printf("%3d| There should be %s space before \"%s\"\n", getLineCount(),
-                    leftCount == 0 ? "no" : "one", spaceMatcher.group(3));
+            if (!spaceMatcher.group(1).matches("")) {
+                System.out.printf("%3d| There should be %s space before \"%s\" (near character %d)\n", getLineCount(),
+                        leftCount == 0 ? "no" : "one", spaceMatcher.group(3), spaceMatcher.end(2) + 1);
+            }
         }
         if (rightCount != -1 && !spaceMatcher.group(4).equals(rightCount == 0 ? "" : " ")) {
             if (!spaceMatcher.group(5).matches("")) {
-                System.out.printf("%3d| There should be %s space after \"%s\"\n", getLineCount(),
-                        rightCount == 0 ? "no" : "one", spaceMatcher.group(3));
+                System.out.printf("%3d| There should be %s space after \"%s\" (near character %d)\n", getLineCount(),
+                        rightCount == 0 ? "no" : "one", spaceMatcher.group(3), spaceMatcher.start(4) + 1);
             }
         }
     }
