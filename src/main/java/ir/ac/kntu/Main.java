@@ -200,7 +200,7 @@ public class Main {
     private static void switchTest(Matcher switchMatcher, BufferedReader reader) throws IOException {
         int startingIndentation = indentation;
         indentation += 4;
-        boolean hasDefault = false;
+        StringBuilder switchString = new StringBuilder();
         getOffset(switchMatcher);
         if (offset == 0) {
             line = reader.readLine();
@@ -218,9 +218,7 @@ public class Main {
                 lineCounter += multipleLinesIndex.size();
                 multipleLinesIndex = new ArrayList<>();
             }
-            if (line.matches("^\\s*default\\s*:.*")) {
-                hasDefault = true;
-            }
+            switchString.append(line);
             if (!line.matches("^\\s*(case\\s+\\S+\\s*:|}|default\\s*:).*")) {
                 indentation += 4;
                 indentationCheck(line);
@@ -233,7 +231,7 @@ public class Main {
             originalLine = line;
             lineCounter++;
         }
-        if (!hasDefault) {
+        if (!switchString.toString().matches(".*default\\s*:.*")) {
             System.out.printf("%3d| Switch block must contain default case\n", getLineCount());
         }
         if (line == null) {
