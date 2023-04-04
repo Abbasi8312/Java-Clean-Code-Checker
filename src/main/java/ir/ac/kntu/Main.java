@@ -87,7 +87,7 @@ public class Main {
         if (offset != 0) {
             line = line.substring(offset);
             if (line.charAt(0) != '}') {
-                System.out.printf("%3d| Multiple statements in one line!\n", getLineCount());
+                System.out.printf("%3d| Multiple statements in one line\n", getLineCount());
                 cleanCodeTest(reader);
             }
         }
@@ -147,9 +147,11 @@ public class Main {
 
     private static void methodTest(Matcher methodMatcher) {
         indentation += 4;
-        if (!methodMatcher.group("name").matches("^[a-z][a-zA-Z0-9]+$")) {
-            System.out.printf("%3d| The method name should be in lowerCamelCase and must have at least 2 characters.\n",
-                    getLineCount());
+        if (!methodMatcher.group("name").matches("^[a-z][a-zA-Z0-9]*$")) {
+            System.out.printf("%3d| The method name should be in lowerCamelCase\n", getLineCount());
+        }
+        if (methodMatcher.group("name").length() <= 1) {
+            System.out.printf("%3d| The method name should have at least 2 characters\n", getLineCount());
         }
         String parameters = methodMatcher.group("parameters");
         variableDeclarationCheck(parameters, 2);
@@ -257,7 +259,7 @@ public class Main {
     private static void classTest(Matcher classMatcher) {
         indentation += 4;
         if (!classMatcher.group("name").matches("^[A-Z][a-zA-Z0-9]*$")) {
-            System.out.printf("%3d| The class name should be in UpperCamelCase.\n", getLineCount());
+            System.out.printf("%3d| The class name should be in UpperCamelCase\n", getLineCount());
         }
         if (classMatcher.group("brace").matches("")) {
             System.out.printf("%3d| class statement must contain \"{\" in front of it\n", getLineCount());
@@ -281,7 +283,7 @@ public class Main {
 
     private static void packageTest(Matcher packageMatcher) {
         if (lineCounter != 1) {
-            System.out.printf("%3d| The \"package\" statement should be the first line of code!\n", getLineCount());
+            System.out.printf("%3d| The \"package\" statement should be the first line of code\n", getLineCount());
         }
         getOffset(packageMatcher);
     }
@@ -292,14 +294,15 @@ public class Main {
 
     private static void indentationCheck(String line) {
         int spaces = 0;
+        int newIndentation = indentation;
         for (int i = 0; i < line.length() && line.charAt(i) == ' '; i++) {
             spaces++;
         }
         if (spaces < line.length() && (line.charAt(spaces) == '}' || line.charAt(spaces) == '{')) {
-            spaces += 4;
+            newIndentation -= 4;
         }
-        if (indentation != spaces && spaces != line.length()) {
-            System.out.printf("%3d| Wrong indentation!\n", getLineCount());
+        if (newIndentation != spaces && spaces != line.length()) {
+            System.out.printf("%3d| Wrong indentation (need %d spaces)\n", getLineCount(), newIndentation);
         }
     }
 
