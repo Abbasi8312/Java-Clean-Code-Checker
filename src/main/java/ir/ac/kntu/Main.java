@@ -60,6 +60,7 @@ public class Main {
         if (offset == 0) {
             spaceCheck();
         }
+        longLine();
         if (matcherMap.get("package").find()) {
             packageTest(matcherMap.get("package"));
         } else if (matcherMap.get("for").find()) {
@@ -96,6 +97,7 @@ public class Main {
 
     public static void multipleLines(BufferedReader reader) throws IOException {
         String tmp = reader.readLine();
+        originalLine = line + " " + tmp.trim();
         modifyLine();
         if (multipleLinesIndex.size() == 0) {
             originalIndentation = indentation;
@@ -118,13 +120,6 @@ public class Main {
 
     private static int getLineCount() {
         return lineCounter + multipleLinesIndex.size();
-    }
-
-    private static String getLine() {
-        if (multipleLinesIndex.size() > 0) {
-            return line.substring(multipleLinesIndex.get(multipleLinesIndex.size() - 1));
-        }
-        return line;
     }
 
     private static void fillMatcherMap(Map<String, Matcher> matcherMap) {
@@ -209,6 +204,7 @@ public class Main {
         getOffset(switchMatcher);
         if (offset == 0) {
             line = reader.readLine();
+            originalLine = line;
             lineCounter++;
         }
         if (switchMatcher.group("brace").matches("")) {
@@ -216,6 +212,7 @@ public class Main {
         }
         while (indentation != startingIndentation && line != null) {
             modifyLine();
+            newLine = line;
             if (multipleLinesIndex.size() != 0) {
                 indentation = originalIndentation;
                 lineCounter += multipleLinesIndex.size();
@@ -233,6 +230,7 @@ public class Main {
             }
             cleanCodeTest(reader);
             line = reader.readLine();
+            originalLine = line;
             lineCounter++;
         }
         if (!hasDefault) {
@@ -422,6 +420,80 @@ public class Main {
             offset = 0;
         }
     }
+
+    private static void longLine() {
+        if (newLine.length() > 80) {
+            System.out.printf("%3d| Line shouldn't have more than 80 characters\n", getLineCount());
+            Matcher matcher = Pattern.compile("([=(]).*$").matcher(newLine);
+            if (matcher.find()) {
+                System.out.printf("%3d| This line can break like this:\n", getLineCount());
+                String tmp = newLine.trim();
+                String originalTmp = originalLine.trim();
+                if (matcher.group(1).equals("(")) {
+                    commaBreak(matcher, tmp, originalTmp);
+                } else if (matcher.group(1).equals("=")) {
+                    operatorBreak(matcher, tmp, originalTmp);
+                } else {
+                    System.out.println("Invalid line");
+                }
+            }
+        }
+    }
+
+    private static void operatorBreak(Matcher matcher, String tmp, String originalTmp) {
+        int indent;
+        indent = matcher.start(1) + 2;
+        for (int i = Math.min(79 - indent, tmp.length() - 1 - indent); i >= 0; i--) {
+            if (tmp.substring(i, i + 1).matches("[+\\-*/%|&^]")) {
+                System.out.printf("%s\n", " ".repeat(indentation) + originalTmp.substring(0, i));
+                originalTmp = originalTmp.substring(i).trim();
+                tmp = tmp.substring(i).trim();
+                break;
+            }
+        }
+        while (tmp.length() + indent > 80) {
+            if (tmp.substring(1, 79 - indent + 1).matches("[^+\\-*/%|&^]*")) {
+                break;
+            }
+            for (int i = 79 - indent; i >= 0; i--) {
+                if (tmp.substring(i, i + 1).matches("[+\\-*/%|&^]")) {
+                    System.out.printf("%s\n", " ".repeat(indent) + originalTmp.substring(0, i));
+                    originalTmp = originalTmp.substring(i).trim();
+                    tmp = tmp.substring(i).trim();
+                    break;
+                }
+            }
+        }
+        System.out.printf("%s\n", " ".repeat(indent) + originalTmp);
+        if ((" ".repeat(indent) + originalTmp).length() > 80) {
+            System.out.println("     Couldn't break the line completely");
+        }
+    }
+
+    private static void commaBreak(Matcher matcher, String tmp, String originalTmp) {
+        int indent;
+        indent = matcher.start(1) + 1;
+        for (int i = Math.min(79 - indent, tmp.length() - 1 - indent); i >= 0; i--) {
+            if (tmp.charAt(i) == ',') {
+                System.out.printf("%s\n", " ".repeat(indentation) + originalTmp.substring(0, i + 1));
+                originalTmp = originalTmp.substring(i + 1).trim();
+                tmp = tmp.substring(i + 1).trim();
+                break;
+            }
+        }
+        while (tmp.length() + indent > 80) {
+            if (tmp.substring(1, 79 - indent + 1).matches("[^,]*")) {
+                break;
+            }
+            for (int i = 79 - indent; i >= 0; i--) {
+                if (tmp.charAt(i) == ',') {
+                    System.out.printf("%s\n", " ".repeat(indent) + originalTmp.substring(0, i + 1));
+                    originalTmp = originalTmp.substring(i + 1).trim();
+                    tmp = tmp.substring(i + 1).trim();
+                    break;
+                }
+            }
+        }
+        System.out.printf("%s\n", " ".repeat(indent) + tmp);
+    }
 }
-//TODO break long lines
-//TODO remove flag
