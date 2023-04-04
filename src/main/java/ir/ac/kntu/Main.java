@@ -3,10 +3,7 @@ package ir.ac.kntu;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,10 +25,11 @@ public class Main {
     private static int offset;
 
     public static void main(String[] args) {
-        BufferedReader reader;
-        String fileName = "Test";
+        System.out.println("Enter file name: ");
+        Scanner scanner = new Scanner(System.in);
+        String fileName = scanner.nextLine();
         try {
-            reader = new BufferedReader(new FileReader("src/main/java/ir/ac/kntu/" + fileName));
+            BufferedReader reader = new BufferedReader(new FileReader("src/main/java/ir/ac/kntu/" + fileName));
             line = reader.readLine();
             lineCounter = 1;
             while (line != null) {
@@ -106,7 +104,7 @@ public class Main {
             if (matcher1.find()) {
                 indentation = matcher1.start() + 1;
             } else if (matcher2.find()) {
-                indentation = matcher2.start() + 1;
+                indentation = matcher2.start() + 2;
             } else {
                 indentation += 8;
             }
@@ -140,7 +138,7 @@ public class Main {
                 getMatcher("(?:\\S+(?:\\[.*]\\s*)*\\s+)?[^\\s(]+\\s*(?:=\\s*(?<equal>[^;]+)?\\s*)?;"));
         matcherMap.put("call", getMatcher("(?<name>\\S+)\\s*\\((?<arguments>.*?)\\)\\s*;"));
         matcherMap.put("switch", getMatcher("switch\\s*(?:\\((?<conditions>.*)\\)\\s*)?\\s*(?<brace>\\{?)"));
-        matcherMap.put("other", getMatcher("case\\s*:|default\\s*:|break\\s*;|continue\\s*;"));
+        matcherMap.put("other", getMatcher("case\\s+\\S+\\s*:|default\\s*:|break\\s*;|continue\\s*;"));
     }
 
     private static Matcher getMatcher(String regex) {
@@ -219,7 +217,8 @@ public class Main {
                 multipleLinesIndex = new ArrayList<>();
             }
             switchString.append(line);
-            if (!line.matches("^\\s*(case\\s+\\S+\\s*:|}|default\\s*:).*")) {
+            if (!line.matches("^\\s*(case\\s+\\S+\\s*:|default\\s*:).*") &&
+                    (!line.matches("^\\s*}.*") || indentation != startingIndentation + 4)) {
                 indentation += 4;
                 indentationCheck(line);
                 indentation -= 4;
@@ -232,7 +231,7 @@ public class Main {
             lineCounter++;
         }
         if (!switchString.toString().matches(".*default\\s*:.*")) {
-            System.out.printf("%3d| Switch block must contain default case\n", getLineCount());
+            System.out.printf("%3d| Switch block must contain default case\n", getLineCount() - 1);
         }
         if (line == null) {
             line = "";
